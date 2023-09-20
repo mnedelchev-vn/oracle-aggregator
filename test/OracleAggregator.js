@@ -22,6 +22,7 @@ describe('Strategy test init.', async function () {
     let WBTC = '0x2260fac5e5542a773aa44fbcfedf7c193bc2c599';
     let DAI = '0x6b175474e89094c44da98b954eedeac495271d0f';
     let XSGD = '0x70e8de73ce538da2beed35d14187f6959a8eca96';
+    let SHIB = '0x95ad61b0a150d79219dcf64e1e6cc01f0b64c4ce';
 
     before(async function() {
         [owner] = await ethers.getSigners();
@@ -35,17 +36,23 @@ describe('Strategy test init.', async function () {
             '0x47Fb2585D2C56Fe188D0E6ec628a38b74fCeeeDf', // CHAINLINK_FEED_REGISTRY
             '0x1F98431c8aD98523631AE4a59f267346ea31F984', // UNISWAP_FACTORY
             UniswapOracleHelper.address
-        ]);
+        ], {kind: 'uups'});
         await OracleContract.deployed();
 
         await OracleContract.setUniswapPools(
-            [XSGD, XSGD, XSGD, WBTC],
-            [WETH, USDC, WBTC, USDC],
+            [XSGD, XSGD, XSGD, WETH, WETH, WETH, WETH, WBTC, WBTC, WBTC],
+            [WETH, USDC, WBTC, USDC, WBTC, USDT, DAI, USDC, USDT, DAI],
             [
                 '0xfcA9090D2C91e11cC546b0D7E4918c79e0088194',
                 '0x6279653c28f138C8B31b8A0F6F8cD2C58E8c1705',
                 '0xbc32d18c5c1138094dabeb3b4d5b720db75c823c',
-                '0x99ac8ca7087fa4a2a1fb6357269965a2014abc35'
+                '0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640',
+                '0xcbcdf9626bc03e24f779434178a73a0b4bad62ed',
+                '0x4e68ccd3e89f51c3074ca5072bbac773960dfa36',
+                '0xc2e9f25be6257c210d7adf0d4cd6e3e881ba25f8',
+                '0x99ac8ca7087fa4a2a1fb6357269965a2014abc35',
+                '0x9db9e0e53058c89e5b94e29621a205198648425b',
+                '0x391e8501b626c623d39474afca6f9e46c2686649',
             ]
         );
 
@@ -61,48 +68,77 @@ describe('Strategy test init.', async function () {
         );
     });
 
-    it('Test ETH pairs', async function () {
-        await expect(await OracleContract.connect(user).checkForPrice(USDC, WETH)).to.be.greaterThan(0);
-        await expect(await OracleContract.connect(user).checkForPrice(WETH, USDC)).to.be.greaterThan(0);
-        await expect(await OracleContract.connect(user).checkForPrice(USDT, WETH)).to.be.greaterThan(0);
-        await expect(await OracleContract.connect(user).checkForPrice(WETH, USDT)).to.be.greaterThan(0);
-        await expect(await OracleContract.connect(user).checkForPrice(DAI, WETH)).to.be.greaterThan(0);
-        await expect(await OracleContract.connect(user).checkForPrice(WETH, DAI)).to.be.greaterThan(0);
+    it('Test Chainlink over Uniswap', async function () {
+        let chainlinkVariations = {
+            usdcToWeth: await OracleContract.priceChainlinkOverUniswap(USDC, WETH),
+            wethToUsdc: await OracleContract.priceChainlinkOverUniswap(WETH, USDC),
+            usdtToWeth: await OracleContract.priceChainlinkOverUniswap(USDT, WETH),
+            wethToUsdt: await OracleContract.priceChainlinkOverUniswap(WETH, USDT),
+            daiToWeth: await OracleContract.priceChainlinkOverUniswap(DAI, WETH),
+            wethToDai: await OracleContract.priceChainlinkOverUniswap(WETH, DAI),
+            wbtcToWeth: await OracleContract.priceChainlinkOverUniswap(WBTC, WETH),
+            wethToWbtc: await OracleContract.priceChainlinkOverUniswap(WETH, WBTC),
+            usdcToWbtc: await OracleContract.priceChainlinkOverUniswap(USDC, WBTC),
+            wbtcToUsdc: await OracleContract.priceChainlinkOverUniswap(WBTC, USDC),
+            usdtToWbtc: await OracleContract.priceChainlinkOverUniswap(USDT, WBTC),
+            wbtcToUsdt: await OracleContract.priceChainlinkOverUniswap(WBTC, USDT),
+            daiToWbtc: await OracleContract.priceChainlinkOverUniswap(DAI, WBTC),
+            wbtcToDai: await OracleContract.priceChainlinkOverUniswap(WBTC, DAI)
+        }
+        
+        for (let key in chainlinkVariations) {
+            console.log(key, chainlinkVariations[key]);
+            await expect(chainlinkVariations[key]).to.be.greaterThan(0);
+        }
     });
 
-    it('Test WBTC pairs', async function () {
-        await expect(await OracleContract.connect(user).checkForPrice(USDC, WBTC)).to.be.greaterThan(0);
-        await expect(await OracleContract.connect(user).checkForPrice(WBTC, USDC)).to.be.greaterThan(0);
-        await expect(await OracleContract.connect(user).checkForPrice(USDT, WBTC)).to.be.greaterThan(0);
-        await expect(await OracleContract.connect(user).checkForPrice(WBTC, USDT)).to.be.greaterThan(0);
-        await expect(await OracleContract.connect(user).checkForPrice(DAI, WBTC)).to.be.greaterThan(0);
-        await expect(await OracleContract.connect(user).checkForPrice(WBTC, DAI)).to.be.greaterThan(0);
-    });
-
-    it('Test XSGD pairs ( Uniswap fallback )', async function () {
-        await expect(await OracleContract.connect(user).checkForPrice(XSGD, WETH)).to.be.greaterThan(0);
-        await expect(await OracleContract.connect(user).checkForPrice(WETH, XSGD)).to.be.greaterThan(0);
-        await expect(await OracleContract.connect(user).checkForPrice(XSGD, USDC)).to.be.greaterThan(0);
-        await expect(await OracleContract.connect(user).checkForPrice(USDC, XSGD)).to.be.greaterThan(0);
-        await expect(await OracleContract.connect(user).checkForPrice(XSGD, WBTC)).to.be.greaterThan(0);
-        await expect(await OracleContract.connect(user).checkForPrice(WBTC, XSGD)).to.be.greaterThan(0);
+    it('Test Uniswap over Chainlink', async function () {
+        let chainlinkVariations = {
+            usdcToWeth: await OracleContract.priceUniswapOverChainlink(USDC, WETH),
+            wethToUsdc: await OracleContract.priceUniswapOverChainlink(WETH, USDC),
+            usdtToWeth: await OracleContract.priceUniswapOverChainlink(USDT, WETH),
+            wethToUsdt: await OracleContract.priceUniswapOverChainlink(WETH, USDT),
+            daiToWeth: await OracleContract.priceUniswapOverChainlink(DAI, WETH),
+            wethToDai: await OracleContract.priceUniswapOverChainlink(WETH, DAI),
+            wbtcToWeth: await OracleContract.priceUniswapOverChainlink(WBTC, WETH),
+            wethToWbtc: await OracleContract.priceUniswapOverChainlink(WETH, WBTC),
+            usdcToWbtc: await OracleContract.priceUniswapOverChainlink(USDC, WBTC),
+            wbtcToUsdc: await OracleContract.priceUniswapOverChainlink(WBTC, USDC),
+            usdtToWbtc: await OracleContract.priceUniswapOverChainlink(USDT, WBTC),
+            wbtcToUsdt: await OracleContract.priceUniswapOverChainlink(WBTC, USDT),
+            daiToWbtc: await OracleContract.priceUniswapOverChainlink(DAI, WBTC),
+            wbtcToDai: await OracleContract.priceUniswapOverChainlink(WBTC, DAI)
+        }
+        
+        for (let key in chainlinkVariations) {
+            console.log(key, chainlinkVariations[key]);
+            await expect(chainlinkVariations[key]).to.be.greaterThan(0);
+        }
     });
 
     it('Test non-existing pairs', async function () {
         // InvalidPair
         await expect(
-            OracleContract.connect(user).checkForPrice(WBTC, WBTC)
+            OracleContract.priceChainlinkOverUniswap(WBTC, WBTC)
         ).to.be.revertedWithCustomError(
             OracleContract,
             "InvalidPair"
         );
 
-        // InvalidPool
+        // InvalidChainlinkPool
         await expect(
-            OracleContract.connect(user).checkForPrice(XSGD, DAI)
+            OracleContract.priceUniswapOverChainlink(XSGD, SHIB)
         ).to.be.revertedWithCustomError(
             OracleContract,
-            "InvalidPool"
+            "InvalidChainlinkPool"
+        );
+
+        // InvalidUniswapPool
+        await expect(
+            OracleContract.priceChainlinkOverUniswap(XSGD, DAI)
+        ).to.be.revertedWithCustomError(
+            OracleContract,
+            "InvalidUniswapPool"
         );
     });
 });
