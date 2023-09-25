@@ -13,17 +13,29 @@ async function main() {
     const WBTC = '0x2260fac5e5542a773aa44fbcfedf7c193bc2c599';
     const DAI = '0x6b175474e89094c44da98b954eedeac495271d0f';
     const XSGD = '0x70e8de73ce538da2beed35d14187f6959a8eca96';
+
+    const Helper = await hre.ethers.getContractFactory("UniswapOracleHelper");
+    const helper = await Helper.deploy();
+    await helper.deployed();
     
-    let OracleFactory = await hre.ethers.getContractFactory('OracleAggregator');
-    let OracleContract = await upgrades.deployProxy(OracleFactory, [
+    const OracleFactory = await hre.ethers.getContractFactory('OracleAggregator');
+    const OracleContract = await upgrades.deployProxy(OracleFactory, [
         '0x47Fb2585D2C56Fe188D0E6ec628a38b74fCeeeDf', // CHAINLINK_FEED_REGISTRY
         '0x1F98431c8aD98523631AE4a59f267346ea31F984', // UNISWAP_FACTORY
-        '0xF2A48d85a1bD0b3373DCdFB871329c958638A747' // UNISWAP_ORACLE_HELPER ( located into separated contract, because Uniswap oracle doesn't support solidity 0.8.x)
-    ]);
+        helper.address // UNISWAP_ORACLE_HELPER
+    ], {kind: 'uups'});
     await OracleContract.deployed();
     console.log(OracleContract.address, 'OracleContract.address');
-    const implAddress = await upgrades.erc1967.getImplementationAddress(OracleContract.address);    
-    console.log(`implementation address: ${implAddress}`);
+
+    // make sure the implementation initialize is also executed
+    const oracleImplementationAddress = await upgrades.erc1967.getImplementationAddress(OracleContract.address);
+    const OracleImplementationFactory = await ethers.getContractFactory("OracleAggregator");
+    const OracleImplementation = await OracleImplementationFactory.attach(oracleImplementationAddress);
+    await OracleImplementation.initialize(
+        '0x47Fb2585D2C56Fe188D0E6ec628a38b74fCeeeDf', // CHAINLINK_FEED_REGISTRY
+        '0x1F98431c8aD98523631AE4a59f267346ea31F984', // UNISWAP_FACTORY
+        helper.address // UNISWAP_ORACLE_HELPER
+    );
 
     await OracleContract.setUniswapPools(
         [XSGD, XSGD, XSGD, WBTC],
