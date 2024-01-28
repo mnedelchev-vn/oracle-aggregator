@@ -8,7 +8,8 @@ import "./interfaces/IChainLinkRegistry.sol";
 import "./interfaces/IUniswapOracleHelper.sol";
 
 /// @title An aggregator for oracles
-/// @author Miroslav Nedelchev
+/// @author https://twitter.com/mnedelchev_
+/// @custom:oz-upgrades-unsafe-allow constructor
 contract OracleAggregator is OwnableUpgradeable, UUPSUpgradeable {
     address public chainlinkFeedRegistry;
     address public uniswapFactory;
@@ -20,6 +21,11 @@ contract OracleAggregator is OwnableUpgradeable, UUPSUpgradeable {
     error InvalidPair();
     error InvalidChainlinkPool();
     error InvalidUniswapPool();
+
+    /// @notice Disabling the initializers to prevent of UUPS implementation getting hijacked
+    constructor() {
+        _disableInitializers();
+    }
 
     function initialize(
         address _chainlinkFeedRegistry,

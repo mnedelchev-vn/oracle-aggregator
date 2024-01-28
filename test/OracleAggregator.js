@@ -39,18 +39,6 @@ describe('Strategy test init.', async function () {
         ], {kind: 'uups'});
         await OracleContract.deployed();
 
-        // make sure the implementation initialize is also executed
-        let oracleImplementationAddress = await upgrades.erc1967.getImplementationAddress(OracleContract.address);
-        const OracleImplementationFactory = await ethers.getContractFactory("OracleAggregator");
-        const OracleImplementation = await OracleImplementationFactory.attach(oracleImplementationAddress);
-        await OracleImplementation.initialize(
-            '0x47Fb2585D2C56Fe188D0E6ec628a38b74fCeeeDf', // CHAINLINK_FEED_REGISTRY
-            '0x1F98431c8aD98523631AE4a59f267346ea31F984', // UNISWAP_FACTORY
-            UniswapOracleHelper.address
-        );
-        expect(await OracleImplementation.owner()).to.not.eq(ethers.constants.AddressZero);
-        expect(await OracleImplementation.owner()).to.eq(owner.address);
-
         await OracleContract.setUniswapPools(
             [XSGD, XSGD, XSGD, WETH, WETH, WETH, WETH, WBTC, WBTC, WBTC],
             [WETH, USDC, WBTC, USDC, WBTC, USDT, DAI, USDC, USDT, DAI],
