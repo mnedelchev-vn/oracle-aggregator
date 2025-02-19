@@ -14,9 +14,8 @@ module.exports = {
     solidity: {
         compilers:[
             {
-              version: '0.8.21',
+              version: '0.8.28',
               settings: {
-                  viaIR: true,
                   optimizer: {
                       enabled: true,
                       runs: 200,
@@ -52,9 +51,6 @@ module.exports = {
     networks: {
         hardhat: {
             forking: {
-                live: false,
-                saveDeployments: false,
-                accounts: [process.env.PRIVATE_KEY_OWNER],
                 url: process.env.MAINNET_NODE
             }
         }

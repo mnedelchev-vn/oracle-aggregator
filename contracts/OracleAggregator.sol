@@ -1,16 +1,18 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.21;
+pragma solidity 0.8.28;
 
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "./interfaces/IERC20.sol";
-import "./interfaces/IChainLinkRegistry.sol";
-import "./interfaces/IUniswapOracleHelper.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {IERC20} from "./interfaces/IERC20.sol";
+import {IChainLinkRegistry} from "./interfaces/IChainLinkRegistry.sol";
+import {IUniswapOracleHelper} from "./interfaces/IUniswapOracleHelper.sol";
+
 
 /// @title An aggregator for oracles
 /// @author https://twitter.com/mnedelchev_
 /// @custom:oz-upgrades-unsafe-allow constructor
-contract OracleAggregator is OwnableUpgradeable, UUPSUpgradeable {
+contract OracleAggregator is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     address public chainlinkFeedRegistry;
     address public uniswapFactory;
     address public uniswapOracleHelper;
@@ -21,8 +23,12 @@ contract OracleAggregator is OwnableUpgradeable, UUPSUpgradeable {
     error InvalidPair();
     error InvalidChainlinkPool();
     error InvalidUniswapPool();
+    error StaleChainlinkAnswer();
+    error InvalidChainlinkAnswer();
+    error IncompleteChainlinkRound();
 
     /// @notice Disabling the initializers to prevent of UUPS implementation getting hijacked
+    /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
     }
@@ -33,6 +39,7 @@ contract OracleAggregator is OwnableUpgradeable, UUPSUpgradeable {
         address _uniswapOracleHelper
     ) public initializer {       
         __Ownable_init();
+        __UUPSUpgradeable_init();
 
         chainlinkFeedRegistry = _chainlinkFeedRegistry;
         uniswapFactory = _uniswapFactory;
@@ -42,7 +49,7 @@ contract OracleAggregator is OwnableUpgradeable, UUPSUpgradeable {
     /*
      * CONTRACT OWNER
      */
-    function _authorizeUpgrade(address) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal onlyOwner override {}
 
     /// @notice Saving the internal Chainlink tokens
     /// @param _tokens The usual tokens addresses
@@ -51,7 +58,7 @@ contract OracleAggregator is OwnableUpgradeable, UUPSUpgradeable {
         for (uint256 i; i < _tokens.length;) {
             chainlinkTokens[_tokens[i]] = _chainlinkTokens[i];
             unchecked {
-                i+=1;
+                ++i;
             }
         }
     }
@@ -64,7 +71,7 @@ contract OracleAggregator is OwnableUpgradeable, UUPSUpgradeable {
         for (uint256 i; i < _tokensIn.length;) {
             uniswapPools[_tokensIn[i]][_tokensOut[i]] = _uniswapPools[i];
             unchecked {
-                i+=1;
+                ++i;
             }
         }
     }
@@ -128,7 +135,15 @@ contract OracleAggregator is OwnableUpgradeable, UUPSUpgradeable {
             _tokenOut = chainlinkTokens[_tokenOut];
         }
 
-        try IChainLinkRegistry(chainlinkFeedRegistry).latestAnswer(_tokenIn, _tokenOut) returns (int256 answer) {
+        try IChainLinkRegistry(chainlinkFeedRegistry).latestRoundData(_tokenIn, _tokenOut) returns (
+            uint80 roundId,
+            int256 answer,
+            uint256 startedAt,
+            uint256 updatedAt,
+            uint80 answeredInRound
+        ) {
+            _validateChainlinkPrice(roundId, answer, updatedAt, answeredInRound);
+                
             // TRY CHAINLINK _tokenIn => _tokenOut
             uint inOutDecimals = IChainLinkRegistry(chainlinkFeedRegistry).decimals(_tokenIn, _tokenOut);
             if (inOutDecimals > tokenOutDecimals) {
@@ -140,7 +155,15 @@ contract OracleAggregator is OwnableUpgradeable, UUPSUpgradeable {
             }
         } catch {
             // TRY CHAINLINK _tokenOut => _tokenIn
-            try IChainLinkRegistry(chainlinkFeedRegistry).latestAnswer(_tokenOut, _tokenIn) returns (int256 answer) {
+            try IChainLinkRegistry(chainlinkFeedRegistry).latestRoundData(_tokenOut, _tokenIn) returns (
+                uint80 roundId,
+                int256 answer,
+                uint256 startedAt,
+                uint256 updatedAt,
+                uint80 answeredInRound
+            ) {
+                _validateChainlinkPrice(roundId, answer, updatedAt, answeredInRound);
+                
                 uint outInDecimals = IChainLinkRegistry(chainlinkFeedRegistry).decimals(_tokenOut, _tokenIn);
                 if (outInDecimals > tokenInDecimals) {
                     return ((10 ** tokenInDecimals) * (10 ** tokenOutDecimals)) / (uint256(answer) / (10 ** (outInDecimals - tokenInDecimals)));
@@ -169,5 +192,16 @@ contract OracleAggregator is OwnableUpgradeable, UUPSUpgradeable {
         }
 
         return IUniswapOracleHelper(uniswapOracleHelper).getQuoteAtTick(pool, uint128(10 ** IERC20(_tokenIn).decimals()), _tokenIn, _tokenOut);
+    }
+
+    function _validateChainlinkPrice(
+        uint80 roundId,
+        int256 answer,
+        uint256 updatedAt,
+        uint80 answeredInRound
+    ) internal view {
+        require(answeredInRound >= roundId, StaleChainlinkAnswer());
+        require(updatedAt > 0, IncompleteChainlinkRound());
+        require(answer > 0, InvalidChainlinkAnswer());
     }
 }

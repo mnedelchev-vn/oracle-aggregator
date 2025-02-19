@@ -23,9 +23,9 @@ describe('Strategy test init.', async function () {
     let DAI = '0x6b175474e89094c44da98b954eedeac495271d0f';
     let XSGD = '0x70e8de73ce538da2beed35d14187f6959a8eca96';
     let SHIB = '0x95ad61b0a150d79219dcf64e1e6cc01f0b64c4ce';
+    let user;
 
     before(async function() {
-        [owner] = await ethers.getSigners();
         user = await impersonateAddress("0x267be1C1D684F78cb4F6a176C4911b741E4Ffdc0");
 
         UniswapOracleHelper = await hre.ethers.getContractFactory('UniswapOracleHelper');
