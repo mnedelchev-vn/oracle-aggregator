@@ -18,8 +18,10 @@ contract OracleAggregator is Initializable, OwnableUpgradeable, UUPSUpgradeable 
     address public uniswapOracleHelper;
 
     mapping(address => address) chainlinkTokens;
+    mapping(address => mapping(address => uint)) chainlinkHeartbeats;
     mapping(address => mapping(address => address)) uniswapPools;
 
+    error InvalidData();
     error InvalidPair();
     error InvalidChainlinkPool();
     error InvalidUniswapPool();
@@ -51,10 +53,22 @@ contract OracleAggregator is Initializable, OwnableUpgradeable, UUPSUpgradeable 
      */
     function _authorizeUpgrade(address newImplementation) internal onlyOwner override {}
 
+    function setChainlinkHeartbeats(address[] calldata _tokensA, address[] calldata _tokensB, uint[] calldata heartbeats) external onlyOwner {
+        require(_tokensA.length == _tokensB.length, InvalidData());
+        require(_tokensB.length == heartbeats.length, InvalidData());
+        for (uint256 i; i < _tokensA.length;) {
+            chainlinkHeartbeats[_tokensA[i]][_tokensB[i]] = heartbeats[i];
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
     /// @notice Saving the internal Chainlink tokens
     /// @param _tokens The usual tokens addresses
     /// @param _chainlinkTokens The internal Chainlink tokens addresses
     function setChainlinkTokens(address[] calldata _tokens, address[] calldata _chainlinkTokens) external onlyOwner {
+        require(_tokens.length == _chainlinkTokens.length, InvalidData());
         for (uint256 i; i < _tokens.length;) {
             chainlinkTokens[_tokens[i]] = _chainlinkTokens[i];
             unchecked {
@@ -68,6 +82,8 @@ contract OracleAggregator is Initializable, OwnableUpgradeable, UUPSUpgradeable 
     /// @param _tokensOut The tokens out of a specific trading pair
     /// @param _uniswapPools The Uniswap pools of the tokens in & tokens out
     function setUniswapPools(address[] calldata _tokensIn, address[] calldata _tokensOut, address[] calldata _uniswapPools) external onlyOwner {
+        require(_tokensIn.length == _tokensOut.length, InvalidData());
+        require(_tokensOut.length == _uniswapPools.length, InvalidData());
         for (uint256 i; i < _tokensIn.length;) {
             uniswapPools[_tokensIn[i]][_tokensOut[i]] = _uniswapPools[i];
             unchecked {
@@ -138,11 +154,11 @@ contract OracleAggregator is Initializable, OwnableUpgradeable, UUPSUpgradeable 
         try IChainLinkRegistry(chainlinkFeedRegistry).latestRoundData(_tokenIn, _tokenOut) returns (
             uint80 roundId,
             int256 answer,
-            uint256 startedAt,
+            uint256,
             uint256 updatedAt,
             uint80 answeredInRound
         ) {
-            _validateChainlinkPrice(roundId, answer, updatedAt, answeredInRound);
+            _validateChainlinkPrice(_tokenIn, _tokenOut, roundId, answer, updatedAt, answeredInRound);
                 
             // TRY CHAINLINK _tokenIn => _tokenOut
             uint inOutDecimals = IChainLinkRegistry(chainlinkFeedRegistry).decimals(_tokenIn, _tokenOut);
@@ -158,11 +174,11 @@ contract OracleAggregator is Initializable, OwnableUpgradeable, UUPSUpgradeable 
             try IChainLinkRegistry(chainlinkFeedRegistry).latestRoundData(_tokenOut, _tokenIn) returns (
                 uint80 roundId,
                 int256 answer,
-                uint256 startedAt,
+                uint256,
                 uint256 updatedAt,
                 uint80 answeredInRound
             ) {
-                _validateChainlinkPrice(roundId, answer, updatedAt, answeredInRound);
+                _validateChainlinkPrice(_tokenIn, _tokenOut, roundId, answer, updatedAt, answeredInRound);
                 
                 uint outInDecimals = IChainLinkRegistry(chainlinkFeedRegistry).decimals(_tokenOut, _tokenIn);
                 if (outInDecimals > tokenInDecimals) {
@@ -195,13 +211,16 @@ contract OracleAggregator is Initializable, OwnableUpgradeable, UUPSUpgradeable 
     }
 
     function _validateChainlinkPrice(
+        address _tokenIn,
+        address _tokenOut,
         uint80 roundId,
         int256 answer,
         uint256 updatedAt,
         uint80 answeredInRound
     ) internal view {
-        require(answeredInRound >= roundId, StaleChainlinkAnswer());
-        require(updatedAt > 0, IncompleteChainlinkRound());
+        uint pairHeartbeat = (chainlinkHeartbeats[_tokenIn][_tokenOut] != 0) ? chainlinkHeartbeats[_tokenIn][_tokenOut] : chainlinkHeartbeats[_tokenOut][_tokenIn];
+        require(answeredInRound >= roundId, IncompleteChainlinkRound());
+        require(updatedAt > block.timestamp - pairHeartbeat, StaleChainlinkAnswer());
         require(answer > 0, InvalidChainlinkAnswer());
     }
 }

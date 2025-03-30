@@ -66,6 +66,20 @@ describe('Strategy test init.', async function () {
                 '0x0000000000000000000000000000000000000348'
             ]
         );
+
+        await OracleContract.setChainlinkHeartbeats(
+            [USDC, USDT, DAI, WBTC, USDC, USDT, DAI],
+            [WETH, WETH, WETH, WETH, WBTC, WBTC, WBTC],
+            [
+                86400,
+                86400,
+                86400,
+                86400,
+                3600,
+                3600,
+                3600
+            ]
+        );
     });
 
     it('Test Chainlink over Uniswap', async function () {

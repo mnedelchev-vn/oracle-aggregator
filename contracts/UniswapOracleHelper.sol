@@ -4,7 +4,7 @@ pragma solidity 0.7.6;
 import "@uniswap/v3-periphery/contracts/libraries/OracleLibrary.sol";
 
 contract UniswapOracleHelper {
-    uint32 public constant UNISWAP_TWAP_RANGE = 300; // 5 minutes TWAP
+    uint32 public constant UNISWAP_TWAP_RANGE = 3600; // 1h TWAP
 
     function getQuoteAtTick(
         address pool,
