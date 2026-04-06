@@ -4,12 +4,12 @@ pragma solidity 0.8.28;
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {IERC20} from "./interfaces/IERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {IChainLinkRegistry} from "./interfaces/IChainLinkRegistry.sol";
 import {IUniswapOracleHelper} from "./interfaces/IUniswapOracleHelper.sol";
 
 
-/// @title An aggregator for oracles
+/// @title An aggregator for Chainlink and Uniswap oracles
 /// @author https://twitter.com/mnedelchev_
 /// @custom:oz-upgrades-unsafe-allow constructor
 contract OracleAggregator is Initializable, OwnableUpgradeable, UUPSUpgradeable {
@@ -40,8 +40,7 @@ contract OracleAggregator is Initializable, OwnableUpgradeable, UUPSUpgradeable 
         address _uniswapFactory,
         address _uniswapOracleHelper
     ) public initializer {       
-        __Ownable_init();
-        __UUPSUpgradeable_init();
+        __Ownable_init(msg.sender);
 
         chainlinkFeedRegistry = _chainlinkFeedRegistry;
         uniswapFactory = _uniswapFactory;
@@ -140,8 +139,8 @@ contract OracleAggregator is Initializable, OwnableUpgradeable, UUPSUpgradeable 
     /// @param _tokenOut The token out of a specific trading pair
     /// @return Price of how much _tokenIn equals in _tokenOut
     function chainlinkOracle(address _tokenIn, address _tokenOut) public view returns(uint) {
-        uint256 tokenInDecimals = IERC20(_tokenIn).decimals();
-        uint256 tokenOutDecimals = IERC20(_tokenOut).decimals();
+        uint256 tokenInDecimals = IERC20Metadata(_tokenIn).decimals();
+        uint256 tokenOutDecimals = IERC20Metadata(_tokenOut).decimals();
 
         if (chainlinkTokens[_tokenIn] != address(0)) {
             _tokenIn = chainlinkTokens[_tokenIn];
@@ -207,7 +206,7 @@ contract OracleAggregator is Initializable, OwnableUpgradeable, UUPSUpgradeable 
             }
         }
 
-        return IUniswapOracleHelper(uniswapOracleHelper).getQuoteAtTick(pool, uint128(10 ** IERC20(_tokenIn).decimals()), _tokenIn, _tokenOut);
+        return IUniswapOracleHelper(uniswapOracleHelper).getQuoteAtTick(pool, uint128(10 ** IERC20Metadata(_tokenIn).decimals()), _tokenIn, _tokenOut);
     }
 
     function _validateChainlinkPrice(

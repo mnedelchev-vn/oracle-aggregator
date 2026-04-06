@@ -2,7 +2,7 @@
 
 ### Project setup commands:
 * ```npm install```
-* ```npx hardhat test --network hardhat test/OracleAggregator.js```
+* ```npx hardhat test test/OracleAggregator.js --network hardhat ```
 
 ### Before starting make sure to create .env file at the root of the project containing the following data:
 ```

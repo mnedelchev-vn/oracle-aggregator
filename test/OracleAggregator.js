@@ -1,6 +1,6 @@
-const hre = require("hardhat");
 const { ethers } = require("hardhat");
 const { expect } = require("chai");
+require("dotenv").config();
 
 async function impersonateAddress(address) {
     await hre.network.provider.request({
@@ -8,7 +8,7 @@ async function impersonateAddress(address) {
         params: [address],
     });
     const signer = await ethers.provider.getSigner(address);
-    signer.address = signer._address;
+    signer.address = signer.address;
     return signer;
 }
 
@@ -28,16 +28,16 @@ describe('Strategy test init.', async function () {
     before(async function() {
         user = await impersonateAddress("0x267be1C1D684F78cb4F6a176C4911b741E4Ffdc0");
 
-        UniswapOracleHelper = await hre.ethers.getContractFactory('UniswapOracleHelper');
-        UniswapOracleHelper = await UniswapOracleHelper.deploy();
+        console.log('Deploying contracts ...');
+        const UniswapOracleHelperFactory = await hre.ethers.getContractFactory('UniswapOracleHelper');
+        UniswapOracleHelper = await UniswapOracleHelperFactory.deploy();
 
         OracleFactory = await hre.ethers.getContractFactory('OracleAggregator');
-        OracleContract = await upgrades.deployProxy(OracleFactory, [
+        OracleContract = await hre.upgrades.deployProxy(OracleFactory, [
             '0x47Fb2585D2C56Fe188D0E6ec628a38b74fCeeeDf', // CHAINLINK_FEED_REGISTRY
             '0x1F98431c8aD98523631AE4a59f267346ea31F984', // UNISWAP_FACTORY
-            UniswapOracleHelper.address
+            UniswapOracleHelper.target
         ], {kind: 'uups'});
-        await OracleContract.deployed();
 
         await OracleContract.setUniswapPools(
             [XSGD, XSGD, XSGD, WETH, WETH, WETH, WETH, WBTC, WBTC, WBTC],

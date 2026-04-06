@@ -1,26 +1,21 @@
 require("@nomicfoundation/hardhat-toolbox");
-require('@openzeppelin/hardhat-upgrades');
+require("@openzeppelin/hardhat-upgrades");
 require("dotenv").config();
 
-/** @type import('hardhat/config').HardhatUserConfig */
-
-//default to mnemonic for testing
-const testKey=
 module.exports = {
+    solidity: "0.8.28",
     defaultNetwork: 'hardhat',
-    etherscan: {
-        apiKey: process.env.ETHERSCAN_API_KEY,
-    },
     solidity: {
-        compilers:[
+        compilers: [
             {
-              version: '0.8.28',
-              settings: {
-                  optimizer: {
-                      enabled: true,
-                      runs: 200,
-                  }
-              }
+                version: '0.8.28',
+                settings: {
+                    viaIR: true,
+                    optimizer: {
+                        enabled: true,
+                        runs: 200,
+                    }
+                }
             },
             {
                 version: '0.7.6',
@@ -34,28 +29,31 @@ module.exports = {
             }
         ],
         overrides: {
-          "contracts/UniswapOracleHelper.sol": {
-              version: '0.7.6',
-              settings: { }
-          },
-          "@uniswap/v3-core/contracts/libraries/TickMath.sol": {
-              version: '0.7.6',
-              settings: { }
-          },
-          "@uniswap/v3-core/contracts/libraries/FullMath.sol": {
-              version: '0.7.6',
-              settings: { }
-          }
+            "contracts/UniswapOracleHelper.sol": {
+                version: '0.7.6',
+                settings: { }
+            },
+            "@uniswap/v3-core/contracts/libraries/TickMath.sol": {
+                version: '0.7.6',
+                settings: { }
+            },
+            "@uniswap/v3-core/contracts/libraries/FullMath.sol": {
+                version: '0.7.6',
+                settings: { }
+            }
         }
     },
     networks: {
         hardhat: {
             forking: {
-                url: process.env.MAINNET_NODE
+                live: false,
+                saveDeployments: false,
+                accounts: [],
+                url: process.env.RPC_NODE
             }
         }
     },
     mocha: {
-        timeout: 100000000
+        timeout: 180000
     }
 };
