@@ -28,6 +28,7 @@ contract OracleAggregator is Initializable, OwnableUpgradeable, UUPSUpgradeable 
     error StaleChainlinkAnswer();
     error InvalidChainlinkAnswer();
     error IncompleteChainlinkRound();
+    error InvalidChainlinkHeartbeat();
 
     /// @notice Disabling the initializers to prevent of UUPS implementation getting hijacked
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -142,15 +143,18 @@ contract OracleAggregator is Initializable, OwnableUpgradeable, UUPSUpgradeable 
         uint256 tokenInDecimals = IERC20Metadata(_tokenIn).decimals();
         uint256 tokenOutDecimals = IERC20Metadata(_tokenOut).decimals();
 
+        address chainlinkTokenIn = _tokenIn;
+        address chainlinkTokenOut = _tokenOut;
+
         if (chainlinkTokens[_tokenIn] != address(0)) {
-            _tokenIn = chainlinkTokens[_tokenIn];
+            chainlinkTokenIn = chainlinkTokens[_tokenIn];
         }
 
         if (chainlinkTokens[_tokenOut] != address(0)) {
-            _tokenOut = chainlinkTokens[_tokenOut];
+            chainlinkTokenOut = chainlinkTokens[_tokenOut];
         }
 
-        try IChainLinkRegistry(chainlinkFeedRegistry).latestRoundData(_tokenIn, _tokenOut) returns (
+        try IChainLinkRegistry(chainlinkFeedRegistry).latestRoundData(chainlinkTokenIn, chainlinkTokenOut) returns (
             uint80 roundId,
             int256 answer,
             uint256,
@@ -160,7 +164,7 @@ contract OracleAggregator is Initializable, OwnableUpgradeable, UUPSUpgradeable 
             _validateChainlinkPrice(_tokenIn, _tokenOut, roundId, answer, updatedAt, answeredInRound);
                 
             // TRY CHAINLINK _tokenIn => _tokenOut
-            uint inOutDecimals = IChainLinkRegistry(chainlinkFeedRegistry).decimals(_tokenIn, _tokenOut);
+            uint inOutDecimals = IChainLinkRegistry(chainlinkFeedRegistry).decimals(chainlinkTokenIn, chainlinkTokenOut);
             if (inOutDecimals > tokenOutDecimals) {
                 return uint256(answer) / (10 ** (inOutDecimals - tokenOutDecimals));
             } else if (inOutDecimals < tokenOutDecimals) {
@@ -170,7 +174,7 @@ contract OracleAggregator is Initializable, OwnableUpgradeable, UUPSUpgradeable 
             }
         } catch {
             // TRY CHAINLINK _tokenOut => _tokenIn
-            try IChainLinkRegistry(chainlinkFeedRegistry).latestRoundData(_tokenOut, _tokenIn) returns (
+            try IChainLinkRegistry(chainlinkFeedRegistry).latestRoundData(chainlinkTokenOut, chainlinkTokenIn) returns (
                 uint80 roundId,
                 int256 answer,
                 uint256,
@@ -179,7 +183,7 @@ contract OracleAggregator is Initializable, OwnableUpgradeable, UUPSUpgradeable 
             ) {
                 _validateChainlinkPrice(_tokenIn, _tokenOut, roundId, answer, updatedAt, answeredInRound);
                 
-                uint outInDecimals = IChainLinkRegistry(chainlinkFeedRegistry).decimals(_tokenOut, _tokenIn);
+                uint outInDecimals = IChainLinkRegistry(chainlinkFeedRegistry).decimals(chainlinkTokenOut, chainlinkTokenIn);
                 if (outInDecimals > tokenInDecimals) {
                     return ((10 ** tokenInDecimals) * (10 ** tokenOutDecimals)) / (uint256(answer) / (10 ** (outInDecimals - tokenInDecimals)));
                 } else if (outInDecimals < tokenInDecimals) {
@@ -218,6 +222,7 @@ contract OracleAggregator is Initializable, OwnableUpgradeable, UUPSUpgradeable 
         uint80 answeredInRound
     ) internal view {
         uint pairHeartbeat = (chainlinkHeartbeats[_tokenIn][_tokenOut] != 0) ? chainlinkHeartbeats[_tokenIn][_tokenOut] : chainlinkHeartbeats[_tokenOut][_tokenIn];
+        require(pairHeartbeat > 0, InvalidChainlinkHeartbeat());
         require(answeredInRound >= roundId, IncompleteChainlinkRound());
         require(updatedAt > block.timestamp - pairHeartbeat, StaleChainlinkAnswer());
         require(answer > 0, InvalidChainlinkAnswer());
